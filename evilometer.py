@@ -1,123 +1,26 @@
 '''
-Created on 21 Jul 2014
+:authors: ankostis@gmail.com, zachani
+:created: 21 Jul 2014
 
-@author: zachani
+Rates arbitrary names based on a pre-rated list of names on some characteristic (ie "evilness")
+
+Given a pre-rated list of names on some characteristic,
+it decomposes them using n_grams and applies information retrieval rating[inv_index]_
+to estimate the rating of any other name on that characteristic.
+
+Example
+-------
+
+    >> python -m evilometer prerated.csv asked.txt
+
 '''
 
 from collections import defaultdict, Counter
 import math
 import re
 import numpy as np
+import pandas as pd
 
-
-prerated_names = {
-    "Nathaniel": -18,
-    "Earendil": -14,
-    "Alustriel": -12,
-    "Lothiriel": -12,
-    "Nefelrith": -12,
-    "Earwen": -10,
-    "Anteimar": -9,
-    "Elanor": -9,
-    "Pippin": -9,
-    "Kalidar": -8,
-    "Alice": -8,
-    "Gallandriel": -8,
-    "Lavender": -8,
-    "Melian": -8,
-    "Aragorn": -7,
-    "Firiel": -7,
-    "Nora": -7,
-    "Nikiforos": -6,
-    "Endrahil": -6,
-    "Esmeralda": -6,
-    "Antonis": -5,
-    "Bregalad": -5,
-    "Finrod": -5,
-    "Laura": -5,
-    "Primula": -5,
-    "Rufus": -5,
-    "Nikias": -4,
-    "Beruthiel": -4,
-    "Celeborn": -4,
-    "Finarfin": -4,
-    "Holman": -4,
-    "Mirabella": -4,
-    "Robin": -4,
-    "Konstantinos": -3,
-    "pullman": -3,
-    "Afgar": -3,
-    "Cirdan": -3,
-    "Durin": -3,
-    "Hobson": -3,
-    "Thorin": -3,
-    "Stefanos": -2,
-    "Zacharof": -2,
-    "Ispra": -2,
-    "Ivy": -2,
-    "Peregrin": -2,
-    "Strider": -2,
-    "Theoden": -2,
-    "spiderman": -1,
-    "Andreth": -1,
-    "Dina": -1,
-    "rachmaninof": 1,
-    "thanos": 3,
-    "Hulk": 3,
-    "Fengel": 3,
-    "Hallatan": 3,
-    "Yavanna": 3,
-    "Roggoff": 4,
-    "thanatos": 4,
-    "dexter": 4,
-    "Victor": 4,
-    "Hildribrad": 4,
-    "Lugdush": 4,
-    "Pharazon": 4,
-    "Wulfgar": 5,
-    "Varese": 5,
-    "Drogo": 5,
-    "Druda": 5,
-    "Orchaldor": 5,
-    "Thorondor": 5,
-    "Giorgos": 6,
-    "Viconia": 6,
-    "Damrod": 6,
-    "Frar": 6,
-    "Hatholdir": 6,
-    "Ufthak": 6,
-    "Vilna": 7,
-    "Verbania": 7,
-    "Eosfor": 7,
-    "Odovocar": 7,
-    "Zimrahin": 7,
-    "Fastolph": 8,
-    "Melkor": 8,
-    "Poszaron": 8,
-    "Thuringwelthin": 8,
-    "Zimrathon": 8,
-    "Manwendil": 9,
-    "Sadoc": 9,
-    "Madoc": 10,
-    "Saradas": 11,
-    "Sigismond": 11,
-    "Vanda": 12,
-    "Asfaloth": 12,
-    "Isembold": 12,
-    "Muzgash": 12,
-    "Gilmikhad": 13,
-    "Isumbras": 13,
-    "Marmadoc": 13,
-    "Radagast": 13,
-    "Smaug": 13,
-    "Inzilbeth": 14,
-    "Gorbadoc": 15,
-    "Carcharoth": 16,
-    "Sakalthor": 16,
-    "Morgoth": 17,
-    "Gothmog": 18,
-    "Gorgoroth": 20,
-}
 
 """The maximum length opf the n_grams to consider (ie when 3 --> 'abc') """
 max_n_grams = 3
@@ -278,24 +181,19 @@ def clean_chars(txt):
     return txt
 
 
-def read_lines(fname):
+def locate_file(fname):
     """
-    Reads file-lines from current-dir or relative to this prog's dir
+    Finds a file in current-dir or relative to this prog's dir
 
     :param str fname: the filename of a file in current-dir or prog's dir containing the lines to return
-    :return: a list of cleaned lines(str)
+    :return: a path(str)
     """
     import os.path as path
 
-    if path.isfile(fname) or path.isabs(fname):
-        nfname = fname
-    else:
-        nfname = path.join(path.dirname(__file__), inp_fname)
+    if not (path.isfile(fname) or path.isabs(fname)):
+        fname = path.join(path.dirname(__file__), asked_fname)
 
-    with open(nfname) as fd:
-        lines = fd.readlines()
-
-    return lines
+    return fname
 
 
 
@@ -311,20 +209,29 @@ def print_score_map_sorted(name_scores):
 if __name__ == "__main__":
     import sys
 
+
+    (prerated_fname, asked_fname) = sys.argv[1], sys.argv[2]
+    (prerated_fname, asked_fname) = [locate_file(fname) for fname in (prerated_fname, asked_fname)]
+
+    prerated_names = pd.Series.from_csv(prerated_fname, header=None)
+    prerated_names = prerated_names.to_dict()
+
+    with open(asked_fname) as fd:
+        asked_names = fd.readlines()
+
     #ngram_scores = generate_and_score_ngrams(prerated_names)
     #print_score_map_sorted(ngram_scores)
 
-    inp_fname = sys.argv[1]
-
-    ask_names = read_lines(inp_fname)
-
     import time
     start = time.clock()
-    evil_names = train_evilometer_and_rate_txts(prerated_names, ask_names)
+    evil_names = train_evilometer_and_rate_txts(prerated_names, asked_names)
     end = time.clock()
     ## 0.024
     ## 0.025
 
+    from _version import __version_info__ as ver
+    args = list(ver)
+    args.append(end-start)
+    print("ver{}.{}.{}: {}ms".format(*args))
     print_score_map_sorted(evil_names)
 
-    print(end-start)

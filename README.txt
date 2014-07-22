@@ -43,6 +43,12 @@ the set of names to be rated, like that::
     >> name_scores = evilometer(train_names, asked_names)
     >> print_scored_names_sorted(name_scores)
 
+cmdline
+-------
+
+    >> python -m evilometer prerated.csv asked.txt
+
+
 
 Contributors
 ==============
