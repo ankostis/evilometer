@@ -8,10 +8,9 @@ from collections import defaultdict, Counter
 import math
 import re
 import numpy as np
-import pandas as pd
 
 
-rated_names = {
+prerated_names = {
     "Nathaniel": -18,
     "Earendil": -14,
     "Alustriel": -12,
@@ -64,6 +63,7 @@ rated_names = {
     "Dina": -1,
     "rachmaninof": 1,
     "thanos": 3,
+    "Hulk": 3,
     "Fengel": 3,
     "Hallatan": 3,
     "Yavanna": 3,
@@ -119,25 +119,42 @@ rated_names = {
     "Gorgoroth": 20,
 }
 
-def train_evilometer_and_rate_names(rated_names, ask_names):
+"""The maximum length opf the n_grams to consider (ie when 3 --> 'abc') """
+max_n_grams = 3
+
+
+def train_evilometer_and_rate_txts(prerated_names, ask_txts):
+    """
+    Main entry point that builds the index from pre-rated names, and calcs score of input texts
+
+    .. Seealso:
+        generate_and_score_ngrams()
+        evilometer_txt()
+    """
+
     ## Train index from sample.
-    #
-    ngram_scores = rate_ngrams(rated_names)
+    ngram_scores = generate_and_score_ngrams(prerated_names)
+    #print_score_map_sorted(ngram_scores)
 
-    return {name: evilometer_name(ngram_scores, name) for name in ask_names}
+    ## Calc score of input.
+    txt_scores = {txt: evilometer_txt(ngram_scores, txt) for txt in ask_txts}
+
+    return txt_scores
 
 
 
 
 
-def evilometer_name(ngram_scores, name):
+def evilometer_txt(ngram_scores, txt):
     """
-    Rates a name based on precalculated n_gram index of scores
+    Rates a txt based on precalculated n_gram index of scores
 
-    :param  scored_names: the precalculated n_gram index of scores, see :func:`rate_ngrams()`
+    :param  ngram_scores: the precalculated n_gram index of scores, see :func:`generate_and_score_ngrams()`
+    :param  str txt: the txt-line to rate
+
     """
 
-    name_freqs = extract_ngrams(name.lower())
+    name_freqs = extract_ngrams(txt)
     ngram_len = np.fromiter(iter(name_freqs.values()), dtype=int).sum()
 
     ## Score = sum(ngram_score * ngram_freq)
@@ -148,12 +165,12 @@ def evilometer_name(ngram_scores, name):
     return score
 
 
-def rate_ngrams(rated_names):
+def generate_and_score_ngrams(prerated_names):
     """
-    Constructs the n_gram index of scores from already rated real-names
+    Constructs the n_gram index of scores from pre-rated names
 
-    :param map rated_names: a map of ``{name(str) --> score(number)}``
-    :return: a map of ``{n_gram(str) --> score(number)] }``
+    :param map prerated_names: a map of ``{name(str) --> score(number)}``
+    :return: the n_gram index, a map of ``{n_gram(str) --> score(number)] }``
 
    First it constructs an inverse-index of ``{ngram_freqs --> [word_frequency, cummulative_score]}``
    and then "averages" the scores of names on each for n_gram as a single number using the
@@ -164,41 +181,45 @@ def rate_ngrams(rated_names):
    where:
 
    * `cummulative_score`: is the product-sum of the frequency of each
-             n_gram times the scores of the rated_names it was found in
-   * `N`: is the total number of rated_names
+             n_gram times the scores of the prerated_names it was found in
+   * `N`: is the total number of prerated_names
    * `wf`: if the word_freq, that is, how many words contain this n_gram.
 
    .. Seealso::
        Inverse document frequency: http://nlp.stanford.edu/IR-book/html/htmledition/inverse-document-frequency-1.html
 
-       In doc-retrieving parlance, the ''word'' or ''rated_names'' terms above are equivalent to the ''document''.
+       In doc-retrieving parlance, the ''word'' or ''prerated_names'' terms above are equivalent to the ''document''.
     """
-    names_len = len(rated_names)
+
+    names_len = len(prerated_names)
+
 
     ## Initialize the inverse index.
     #
-    def initial_counter_values():
+    def initial_scores():
         return [0, 0]                           ## ``[word_freq, cummulative_score]``
-    ngram_counters = defaultdict(initial_counter_values)
+    ngram_counters = defaultdict(initial_scores)
 
-    for (name, score) in rated_names.items():
+    for (name, score) in prerated_names.items():
         ngram_freqs = extract_ngrams(name.lower())
 
         ##
         for (ng, ng_freq) in ngram_freqs.items():
+            assert ng_freq>0 and score != 0, (ng_freq, score)
             ng_counters = ngram_counters[ng]
-            ng_counters[0] += 1                 ## update ``word_freq``.
+            ng_counters[0] += ng_freq        ## update ``word_freq``.
             ng_counters[1] += score * ng_freq   ## update ``cummulative_score``
 
     def rate_ngram(word_freq, cummulative_score):
-        """Produces the scores for each n_gram according to the formula in :func:`rate_ngrams()`"""
-        return cummulative_score * math.log(names_len / word_freq)
+        """Produces the scores for each n_gram according to the formula in :func:`generate_and_score_ngrams()`"""
+        return cummulative_score * math.log10(names_len / word_freq)
+
     ngram_scores = {ng: rate_ngram(*counters) for (ng, counters) in ngram_counters.items()}
 
     return ngram_scores
 
 
-def extract_ngrams(name, n=3):
+def extract_ngrams(name, n=max_n_grams):
     """
     Returns the frequencies of ngrams of a word after having appended the `^` and `$` chars at its start/end, respectively
 
@@ -209,56 +230,101 @@ def extract_ngrams(name, n=3):
     ## 1 ngrams:
     ##    gather them without ``^$`` bracket-chars.
     #
-    #ngrams = list(name)
-    ngrams = list()
+    name = clean_chars(name)
+    ngrams = list(name)
+    #ngrams = list()
 
     ## 2+ ngrams:
-    ##     bracket them before gathering.
+    ##     bracket words them before gathering.
     #
-    name = mark_word_boundaries(name) # some name --> ^some$ ^name$
+    name = mark_word_boundaries(name)
     for n in range(2, n+1):
         ngrams.extend([name[i:i+n] for i in range(0, len(name) - n + 1)])
     #
-    ##  The `ngrams` list now contains repetitions.
+    ##  The `ngrams` list above contains repetitions.
 
     ngram_freqs = Counter()
     ngram_freqs.update(ngrams)
+
+    ## Remove artifacts from word-baracketing.
+    #
+    assert not (set(['  ', '^', '$']) & ngram_freqs.keys())
+    ngrams_to_remove = ('$ ^', '$ ', ' ^')
+    for ng in ngrams_to_remove:
+        ngram_freqs.pop(ng, None)
 
     return ngram_freqs
 
 
 _mark_word_regex = re.compile(r'\b')
-_mark_prefix_regex = re.compile('\b\^')
+_mark_prefix_regex = re.compile(r'\b\^')
 def mark_word_boundaries(sentence):
     """ Makes: ``"some name " --> "^some$ ^name$ "`` """
+
     sentence = _mark_word_regex.sub('^', sentence)
     sentence = _mark_prefix_regex.sub('$', sentence)
 
     return sentence
 
 
+_nonword_char_regex = re.compile('\W+')
+def clean_chars(txt):
+    """
+    Simplify text before n_gram extraction by replacing non-ascii chars with space or turning them to lower
+    """
 
-def print_scored_names_sorted(name_scores):
+    _nonword_char_regex.sub(' ', txt).lower().strip()
+
+    return txt
+
+
+def read_lines(fname):
+    """
+    Reads file-lines from current-dir or relative to this prog's dir
+
+    :param str fname: the filename of a file in current-dir or prog's dir containing the lines to return
+    :return: a list of cleaned lines(str)
+    """
+    import os.path as path
+
+    if path.isfile(fname) or path.isabs(fname):
+        nfname = fname
+    else:
+        nfname = path.join(path.dirname(__file__), inp_fname)
+
+    with open(nfname) as fd:
+        lines = fd.readlines()
+
+    return lines
+
+
+
+def print_score_map_sorted(name_scores):
     """Prints a sorted map by values (sorting copied from: http://stackoverflow.com/questions/613183/python-sort-a-dictionary-by-value)"""
     import operator
     sorted_pairs = sorted(name_scores.items(), key=operator.itemgetter(1))
-    for pair in sorted_pairs:
-        print("%s, %4.2f" % pair)
+    for (key, val) in sorted_pairs:
+        print("%s, %4.2f" % (key.strip(), val))
 
 
 
 if __name__ == "__main__":
-    import os
     import sys
 
-    #ngram_scores = rate_ngrams(rated_names)
-    #print_scored_names_sorted(ngram_scores)
+    #ngram_scores = generate_and_score_ngrams(prerated_names)
+    #print_score_map_sorted(ngram_scores)
 
     inp_fname = sys.argv[1]
 
-    with open(os.path.join(os.path.dirname(__file__), inp_fname)) as fd:
-        ask_names = fd.readlines()
-        ask_names = [n.strip() for n in ask_names]
+    ask_names = read_lines(inp_fname)
 
-    evil_names = train_evilometer_and_rate_names(rated_names, ask_names)
-    print_scored_names_sorted(evil_names)
+    import time
+    start = time.clock()
+    evil_names = train_evilometer_and_rate_txts(prerated_names, ask_names)
+    end = time.clock()
+    ## 0.024
+    ## 0.025
+
+    print_score_map_sorted(evil_names)
+
+    print(end-start)
