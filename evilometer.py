@@ -170,15 +170,15 @@ def mark_word_boundaries(txt):
     return txt
 
 
-_nonword_char_regex = re.compile(r'\W+')
-# _deduplicate_chars_regex = re.compile(r'(\w)\1+')
+_nonword_char_regex = re.compile(r'(\W|\d)+')
+_deduplicate_chars_regex = re.compile(r'(\w)\1+')
 def clean_chars(txt):
     """
     Simplify text before n_gram extraction by replacing non-ascii chars with space or turning them to lower
     """
 
     txt = _nonword_char_regex.sub(' ', txt).strip().lower()
-#     txt = _deduplicate_chars_regex.sub(r'\1', txt)
+    txt = _deduplicate_chars_regex.sub(r'\1', txt)
 
     return txt
 
