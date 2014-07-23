@@ -110,12 +110,12 @@ def generate_and_score_ngrams(prerated_names):
         for (ng, ng_freq) in ngram_freqs.items():
             assert ng_freq>0 and score != 0, (ng_freq, score)
             ng_counters = ngram_counters[ng]
-            ng_counters[0] += ng_freq        ## update ``word_freq``.
+            ng_counters[0] += 1              	## update ``word_freq``.
             ng_counters[1] += score * ng_freq   ## update ``cummulative_score``
 
     def rate_ngram(word_freq, cummulative_score):
         """Produces the scores for each n_gram according to the formula in :func:`generate_and_score_ngrams()`"""
-        return cummulative_score * math.log10(names_len / word_freq)
+        return cummulative_score * math.log(names_len / word_freq)
 
     ngram_scores = {ng: rate_ngram(*counters) for (ng, counters) in ngram_counters.items()}
 
@@ -130,22 +130,22 @@ def extract_ngrams(name, n=max_n_grams):
     :return: a map of ``{n_gram(str) --> freq(int)}``
     """
 
-    ## 1 ngrams:
-    ##    gather them without ``^$`` bracket-chars.
-    #
     name = clean_chars(name)
+
+    ## Gather 1 ngrams them without ``^$`` bracket-chars.
+    #
     ngrams = list(name)
     #ngrams = list()
 
-    ## 2+ ngrams:
-    ##     bracket words them before gathering.
+    ## Gather 2+ ngrams after bracketingt words.
     #
     name = mark_word_boundaries(name)
     for n in range(2, n+1):
         ngrams.extend([name[i:i+n] for i in range(0, len(name) - n + 1)])
-    #
-    ##  The `ngrams` list above contains repetitions.
 
+    ## Consolidate the The ngrams repetitions
+    #    from the list above.
+    #
     ngram_freqs = Counter()
     ngram_freqs.update(ngrams)
 
@@ -161,13 +161,13 @@ def extract_ngrams(name, n=max_n_grams):
 
 _mark_word_regex = re.compile(r'\b')
 _mark_prefix_regex = re.compile(r'\b\^')
-def mark_word_boundaries(sentence):
+def mark_word_boundaries(txt):
     """ Makes: ``"some name " --> "^some$ ^name$ "`` """
 
-    sentence = _mark_word_regex.sub('^', sentence)
-    sentence = _mark_prefix_regex.sub('$', sentence)
+    txt = _mark_word_regex.sub('^', txt)
+    txt = _mark_prefix_regex.sub('$', txt)
 
-    return sentence
+    return txt
 
 
 _nonword_char_regex = re.compile('\W+')
@@ -176,7 +176,7 @@ def clean_chars(txt):
     Simplify text before n_gram extraction by replacing non-ascii chars with space or turning them to lower
     """
 
-    _nonword_char_regex.sub(' ', txt).lower().strip()
+    txt = _nonword_char_regex.sub(' ', txt).strip().lower()
 
     return txt
 
@@ -232,6 +232,6 @@ if __name__ == "__main__":
     from _version import __version_info__ as ver
     args = list(ver)
     args.append(end-start)
-    print("ver{}.{}.{}: {}ms".format(*args))
+    print("ver{}.{}.{}: {:.4f}ms".format(*args))
     print_score_map_sorted(evil_names)
 
