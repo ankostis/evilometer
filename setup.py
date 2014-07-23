@@ -123,12 +123,20 @@ setup(
     install_requires = [
         'numpy',
         'pandas',
-        'xlrd',
     ],
     test_requires = [
     ],
     options = {
         'build_exe': {
+            "excludes": [ "tkinter","PyQt4","PySide",
+                "scipy", "IPython", "numexpr",
+                "pygments", "pyreadline", "jinja2",
+                "setuptools", "distutils",
+                "matplotlib", "statsmodels", "docutils",
+                "urllib", "http","email",
+                "xml", "xmlrpc",
+                "nose",
+                "Cython", "pydoc_data", "sphinx", "docutils", ],
             'include_msvcr': True,
             'compressed': True,
             'include_in_shared_zip': True,
