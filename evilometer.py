@@ -2,7 +2,7 @@
 :authors: ankostis@gmail.com, zachani
 :created: 21 Jul 2014
 
-Rates arbitrary names based on a pre-rated list of names on some characteristic (ie "evilness")
+Rates text based on its n_gram similarity with a pre-rated list of names on some arbitrary characteristic (ie "evilness")
 
 Given a pre-rated list of names on some characteristic,
 it decomposes them using n_grams and applies information retrieval rating[inv_index]_
@@ -11,7 +11,10 @@ to estimate the rating of any other name on that characteristic.
 Example
 -------
 
-    >> python -m evilometer prerated.csv asked.txt
+    >> python -m evilometer     prerated.csv asked.txt
+    >> python -m evilometer     prerated.csv asked1.txt asked2.txt
+    >> python -m evilometer     -i prerated1.csv prerated2.csv  -\
+                                o asked.txt asked2.txt
 
 '''
 
@@ -24,6 +27,81 @@ import pandas as pd
 
 """The maximum length opf the n_grams to consider (ie when 3 --> 'abc') """
 max_n_grams = 3
+
+
+def main(prgram_name):
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[4])
+
+    prerated_group = parser.add_mutually_exclusive_group(required=True)
+    prerated_help = "The name of 2-column csv-file:    txt,score "
+    prerated_group.add_argument('-i', nargs='*', metavar='CSVFILE', dest='prerated_fnames',
+            help="%s \n%s"%(prerated_help, "STDIN implied if filename omitted."))
+    prerated_group.add_argument('prerated_fname', nargs='?', metavar='CSVFILE', help=prerated_help)
+
+    asked_group = parser.add_mutually_exclusive_group(required=True)
+    asked_help = "The name of a file with the text-lines to be rated. "
+    asked_group.add_argument('-o', nargs='*', metavar='TXTFILE', dest='asked_fnames',
+            help="%s \n%s"%(asked_help, "STDIN implied if filename omitted."))
+    asked_group.add_argument('asked_fname', nargs='?', metavar='TXTFILE', help=asked_help)
+    opts = parser.parse_args()
+
+    #print(opts)
+
+    if opts.prerated_fname:
+        opts.prerated_fnames = [opts.prerated_fname]
+    prerated_names = read_prerated_csv(opts.prerated_fnames)
+
+    if opts.asked_fname:
+        opts.asked_fnames = [opts.asked_fname]
+    asked_txt = read_txt_lines(opts.asked_fnames)
+
+    #ngram_scores = generate_and_score_ngrams(prerated_names)
+    #print_score_map_sorted(ngram_scores)
+
+    import time
+    start = time.clock()
+    evil_names = train_evilometer_and_rate_txts(prerated_names, asked_txt)
+    end = time.clock()
+    ## 0.024
+    ## 0.025
+
+    from _version import __version_info__ as ver
+    args = list(ver)
+    args.append(end-start)
+    print("ver{}.{}.{}: {:.4f}ms".format(*args))
+    print_score_map_sorted(evil_names)
+
+
+
+def read_prerated_csv(csv_fnames):
+    csv_fnames = [locate_file(fname) for fname in csv_fnames]
+
+    prerated_txt = {}
+    for csv_fname in csv_fnames:
+        prerated_txt.update(pd.Series.from_csv(csv_fname, header=None).to_dict())
+
+    return prerated_txt
+
+def read_txt_lines(txt_fnames):
+    txt_fnames = [locate_file(fname) for fname in txt_fnames]
+
+    txt = set()
+    for fn in txt_fnames:
+        with open(fn) as fd:
+            txt.update(set(fd.readlines()))
+
+    word_set = set()
+
+    ## Ask scores also for splitted-words.
+    #
+    for ln in txt:
+        word_set.update(clean_chars(ln).split(' '))
+    txt.update(word_set)
+
+    return txt
+
 
 
 def train_evilometer_and_rate_txts(prerated_names, ask_txts):
@@ -171,7 +249,9 @@ def mark_word_boundaries(txt):
 
 
 _nonword_char_regex = re.compile(r'(\W|\d)+')
+_single_char_regex = re.compile(r'\b\w\b')
 _deduplicate_chars_regex = re.compile(r'(\w)\1+')
+_deduplicate_spaces_regex = re.compile(r' {2}')
 def clean_chars(txt):
     """
     Simplify text before n_gram extraction by replacing non-ascii chars with space or turning them to lower
@@ -179,6 +259,8 @@ def clean_chars(txt):
 
     txt = _nonword_char_regex.sub(' ', txt).strip().lower()
     txt = _deduplicate_chars_regex.sub(r'\1', txt)
+    txt = _single_char_regex.sub('', txt)
+    txt = _deduplicate_spaces_regex.sub('', txt)
 
     return txt
 
@@ -209,31 +291,7 @@ def print_score_map_sorted(name_scores):
 
 
 if __name__ == "__main__":
-    import sys
+    import sys, os
 
-    prerated_fname, *asked_fnames = [locate_file(fname) for fname in sys.argv[1:]]
-
-    prerated_names = pd.Series.from_csv(prerated_fname, header=None)
-    prerated_names = prerated_names.to_dict()
-
-    asked_names = []
-    for fn in asked_fnames:
-        with open(fn) as fd:
-            asked_names.extend(fd.readlines())
-
-    #ngram_scores = generate_and_score_ngrams(prerated_names)
-    #print_score_map_sorted(ngram_scores)
-
-    import time
-    start = time.clock()
-    evil_names = train_evilometer_and_rate_txts(prerated_names, asked_names)
-    end = time.clock()
-    ## 0.024
-    ## 0.025
-
-    from _version import __version_info__ as ver
-    args = list(ver)
-    args.append(end-start)
-    print("ver{}.{}.{}: {:.4f}ms".format(*args))
-    print_score_map_sorted(evil_names)
-
+    program_name    = os.path.basename(sys.argv[0])[:-3]
+    main(program_name)
