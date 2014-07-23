@@ -86,13 +86,14 @@ def readtxtfile(fname):
     with open(os.path.join(mydir, fname)) as fd:
         return fd.read()
 
+_myverstr = '.'.join(str(s) for s in readversioninfo('_version.py'))
 setup(
     name = projname,
 #    packages = [projname],
 #     package_data= {'projname': ['data/*.csv']},
     py_modules = ['evilometer'],
 #    test_suite="fuefit.test", #TODO: check setup.py testsuit indeed works.
-    version = '.'.join(readversioninfo('_version.py')),
+    version = _myverstr,
     description = __doc__.strip().split("\n")[0],
     author = "ankostis",
     author_email = "ankostis@gmail.com",
