@@ -92,6 +92,9 @@ setup(
 #    packages = [projname],
 #     package_data= {'projname': ['data/*.csv']},
     py_modules = ['evilometer'],
+    package_data = {
+        '': ["prerated-*"]
+        },
 #    test_suite="fuefit.test", #TODO: check setup.py testsuit indeed works.
     version = _myverstr,
     description = __doc__.strip().split("\n")[0],
@@ -131,12 +134,14 @@ setup(
             "excludes": [ "tkinter","PyQt4","PySide",
                 "scipy", "IPython", "numexpr",
                 "pygments", "pyreadline", "jinja2",
-                "setuptools", "distutils",
+                "setuptools",
                 "matplotlib", "statsmodels", "docutils",
-                "urllib", "http","email",
                 "xml", "xmlrpc",
                 "nose",
-                "Cython", "pydoc_data", "sphinx", "docutils", ],
+                "Cython", "pydoc_data", "sphinx", "docutils",
+                #urllib<--email<--http<--pandas
+                #distutils" <-- pandas.compat
+                ],
             'include_msvcr': True,
             'compressed': True,
             'include_in_shared_zip': True,

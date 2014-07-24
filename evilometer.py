@@ -292,7 +292,7 @@ def read_txt_lines(txt_fnames, text_cleaner, split_words=False):
 
     if split_words:
         for ln in txt:
-            word_set.update(text_cleaner.clean_chars(ln).split(' '))
+            word_set.update(text_cleaner.clean_chars(ln).split())
         txt.update(word_set)
 
     return txt
