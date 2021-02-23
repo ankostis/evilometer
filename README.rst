@@ -2,7 +2,7 @@
 evilometer: Rates arbitrary names based on a pre-rated list of names on some characteristic (ie "evilness")
 ==============================================
   * Copyright : July-2014, (c) AGPLv3 or later
-  * Developed : by ankostis@gmail.com & Nikifors Zacharoff
+  * Developed : by ankostis@gmail.com & `Nikifors Zacharoff <https://github.com/nikizak>`_
   * License   : GNU Affero General Public License v3 or later (AGPLv3+)
 
 
